@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCHC Context Editor</title>
+  <style>
+    /* Light, developer-friendly theme */
+    body {
+      font-family: Consolas, "Courier New", monospace;
+      background-color: #f5f5f5;
+      color: #333;
+      margin: 20px;
+      line-height: 1.5;
+    }
+    h1, h2, h3 {
+      color: #0066cc;
+    }
+    section {
+      margin-bottom: 25px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      background-color: #ffffff;
+      border-radius: 4px;
+    }
+    label {
+      display: block;
+      margin-top: 8px;
+      color: #333;
+    }
+    input, select, button {
+      background-color: #fff;
+      border: 1px solid #ccc;
+      color: #333;
+      padding: 4px 8px;
+      margin-top: 4px;
+      border-radius: 2px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background-color: #e6e6e6;
+      color: #333;
+    }
+    .row-actions {
+      text-align: center;
+    }
+    .hidden { display: none; }
+    .small-input { width: 80px; }
+    button {
+      cursor: pointer;
+    }
+    pre {
+      background-color: #eee;
+      border: 1px solid #ccc;
+      padding: 10px;
+      overflow-x: auto;
+    }
+    /* Walkthrough styling */
+    #walkthrough {
+      background-color: #e6f2ff;
+      border: 1px solid #99ccff;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SCHC Context Editor</h1>
+
+  <!-- Walkthrough Section -->
+  <section id="walkthrough">
+    <h2>Walkthrough</h2>
+    <p>This SCHC Context Editor allows you to create multiple compression and fragmentation rules for SCHC contexts.</p>
+    <ol>
+      <li><strong>Protocols Management:</strong> Load or download protocol definitions in JSON format. These definitions include field properties (bit length, default values, YANG identifiers) for each protocol. New protocols (e.g., QUIC, MQTT, MQTT-SN) are supported by default.</li>
+      <li><strong>Import/Export Context:</strong> Export the current SCHC context (all rules) to a JSON file or import an existing context.</li>
+      <li><strong>Rules List:</strong> Create and view a list of rules. Each rule is automatically assigned an incremented RuleID. The list shows basic details such as rule type (compression or fragmentation) and a summary.</li>
+      <li><strong>Rule Details:</strong> Edit the details of a selected rule. For compression rules, select network protocols and automatically generate rule entry rows. For fragmentation rules, select a preset for L2 technology (e.g., LoRaWAN/Uplink/No-Ack) to auto-fill fragmentation parameters.</li>
+      <li><strong>Generate JSON:</strong> Once your rules are defined, click "Generate JSON" to produce the SCHC context output.</li>
+    </ol>
+    <p>Feel free to clone it and make improvements!</p>
+    <p>License: MIT</p>
+    <p>Alexander Pelov, 2025</p>
+  </section>
+
+  <!-- Protocols Management Section -->
+  <section id="protocols-section">
+    <h2>Protocols Management</h2>
+    <p>You can load new protocol definitions (JSON) or download the current protocols.</p>
+    <button type="button" onclick="downloadProtocols()">Download Protocols JSON</button>
+    <input type="file" id="protocolFile" accept="application/json" onchange="loadProtocols(event)" />
+  </section>
+
+  <!-- Import/Export Context Section -->
+  <section id="import-export-section">
+    <h2>Import / Export SCHC Context</h2>
+    <button type="button" onclick="exportJSON()">Export Context JSON</button>
+    <input type="file" id="importFile" accept="application/json" onchange="importJSON(event)" />
+  </section>
+
+  <!-- 1. Rules List Section -->
+  <section id="rules-list-section">
+    <h2>Rules List</h2>
+    <table id="rulesListTable">
+      <thead>
+        <tr>
+          <th>RuleID</th>
+          <th>Length (bits)</th>
+          <th>Type</th>
+          <th>Summary</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rule rows will be inserted here -->
+      </tbody>
+    </table>
+    <button type="button" onclick="addRule()">Add Rule</button>
+  </section>
+
+  <!-- 2. Rule Details Section -->
+  <section id="rule-details-section" class="hidden">
+    <h2>Rule Details</h2>
+    <label>
+      Rule ID Value:
+      <input type="number" id="detailRuleIdValue" class="small-input" value="1" min="0" readonly>
+    </label>
+    <label>
+      Rule ID Length (bits):
+      <input type="number" id="detailRuleIdLength" class="small-input" value="8" min="0" max="32">
+    </label>
+    <label>
+      Rule Nature:
+      <select id="detailRuleNature" onchange="toggleRuleDataSection()">
+        <option value="compression">Compression</option>
+        <option value="fragmentation">Fragmentation</option>
+      </select>
+    </label>
+
+    <!-- Compression Rule Data -->
+    <div id="compression-data-section">
+      <h3>Compression Rule Data</h3>
+      <div id="protocol-selection">
+        <h4>Select Network Protocols</h4>
+        <label><input type="checkbox" name="protocol" value="Ethernet" onchange="updateAutoRows()"> Ethernet</label>
+        <label><input type="checkbox" name="protocol" value="IPv4" onchange="updateAutoRows()"> IPv4</label>
+        <label><input type="checkbox" name="protocol" value="IPv6" onchange="updateAutoRows()"> IPv6</label>
+        <label><input type="checkbox" name="protocol" value="UDP" onchange="updateAutoRows()"> UDP</label>
+        <label><input type="checkbox" name="protocol" value="CoAP" onchange="updateAutoRows()"> CoAP</label>
+        <label><input type="checkbox" name="protocol" value="OSCORE" onchange="updateAutoRows()"> OSCORE</label>
+        <label><input type="checkbox" name="protocol" value="QUIC" onchange="updateAutoRows()"> QUIC</label>
+        <label><input type="checkbox" name="protocol" value="MQTT" onchange="updateAutoRows()"> MQTT</label>
+        <label><input type="checkbox" name="protocol" value="MQTT-SN" onchange="updateAutoRows()"> MQTT-SN</label>
+      </div>
+      <div>
+        <h4>Compression Rule Entries</h4>
+        <table id="compressionTable">
+          <thead>
+            <tr>
+              <th>FID</th>
+              <th>FL (bits)</th>
+              <th>FP</th>
+              <th>DI</th>
+              <th>TV</th>
+              <th>MO</th>
+              <th>CDA</th>
+              <th class="row-actions">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Auto-generated rows appear here -->
+          </tbody>
+        </table>
+        <button type="button" onclick="addManualEntry()">Add Manual Entry</button>
+      </div>
+    </div>
+
+    <!-- Fragmentation Rule Data -->
+    <div id="fragmentation-data-section" class="hidden">
+      <h3>Fragmentation Rule Data</h3>
+      <label>
+        L2 Technology Preset:
+        <select id="fragPreset" onchange="applyFragPreset()">
+          <option value="">-- Select Preset --</option>
+          <option value="lorawan_uplink_noack">LoRaWAN/Uplink/No-Ack</option>
+          <option value="lorawan_downlink_noack">LoRaWAN/Downlink/No-Ack</option>
+          <option value="lorawan_uplink_ack_on_error">LoRaWAN/Uplink/ACK-On-Error</option>
+          <option value="sigfox_uplink_noack">Sigfox/Uplink/No-Ack</option>
+          <option value="sigfox_downlink_noack">Sigfox/Downlink/No-Ack</option>
+          <option value="nbiot_uplink_noack">NB-IOT/Uplink/No-Ack</option>
+          <option value="nbiot_downlink_noack">NB-IOT/Downlink/No-Ack</option>
+        </select>
+      </label>
+      <label>
+        Fragmentation Mode:
+        <select id="fragMode">
+          <option value="fragmentation-mode-no-ack">No-ACK</option>
+          <option value="fragmentation-mode-ack-always">ACK-Always</option>
+          <option value="fragmentation-mode-ack-on-error">ACK-on-Error</option>
+        </select>
+      </label>
+      <label>
+        L2 Word Size (bits):
+        <input type="number" id="l2WordSize" min="1">
+      </label>
+      <label>
+        Direction:
+        <select id="fragDirection">
+          <option value="di-up">Uplink</option>
+          <option value="di-down">Downlink</option>
+        </select>
+      </label>
+      <label>
+        DTag Size (bits):
+        <input type="number" id="dtagSize" min="0">
+      </label>
+      <label>
+        FCN Size (bits):
+        <input type="number" id="fcnSize" min="1">
+      </label>
+      <label>
+        Maximum Packet Size (bytes):
+        <input type="number" id="maxPacketSize" min="1">
+      </label>
+    </div>
+
+    <button type="button" onclick="saveRuleDetails()">Save Rule Details</button>
+  </section>
+
+  <button type="button" onclick="generateJSON()">Generate JSON</button>
+  <h2>Generated SCHC Context JSON</h2>
+  <pre id="outputJSON"></pre>
+
+  <script>
+    /********* Global Data Structures **********/
+    let rulesData = [];
+    let ruleCounter = 1;
+    let currentRuleIndex = null;
+
+    // Mapping of protocol fields and properties.
+    // Default protocols with field definitions; users can load new definitions.
+    let fieldProperties = {
+      "Ethernet": {
+        "Destination MAC": { length: 48, default: "", yang: "fid-ethernet-dest-mac" },
+        "Source MAC":      { length: 48, default: "", yang: "fid-ethernet-src-mac" },
+        "Type":            { length: 16, default: "", yang: "fid-ethernet-type" }
+      },
+      "IPv4": {
+        "Version":         { length: 4,  default: "4", yang: "fid-ipv4-version" },
+        "Header Length":   { length: 4,  default: "",  yang: "fid-ipv4-header-length" },
+        "Total Length":    { length: 16, default: "",  yang: "fid-ipv4-total-length" },
+        "Identification":  { length: 16, default: "",  yang: "fid-ipv4-identification" },
+        "Flags":           { length: 3,  default: "",  yang: "fid-ipv4-flags" },
+        "Fragment Offset": { length: 13, default: "",  yang: "fid-ipv4-fragment-offset" },
+        "TTL":             { length: 8,  default: "",  yang: "fid-ipv4-ttl" },
+        "Protocol":        { length: 8,  default: "",  yang: "fid-ipv4-protocol" },
+        "Header Checksum": { length: 16, default: "",  yang: "fid-ipv4-header-checksum" },
+        "Source IP":       { length: 32, default: "",  yang: "fid-ipv4-src-ip" },
+        "Destination IP":  { length: 32, default: "",  yang: "fid-ipv4-dest-ip" }
+      },
+      "IPv6": {
+        "Version":         { length: 4,  default: "",  yang: "fid-ipv6-version" },
+        "Traffic Class":   { length: 8,  default: "",  yang: "fid-ipv6-trafficclass" },
+        "Flow Label":      { length: 20, default: "",  yang: "fid-ipv6-flowlabel" },
+        "Payload Length":  { length: 16, default: "",  yang: "fid-ipv6-payload-length" },
+        "Next Header":     { length: 8,  default: "",  yang: "fid-ipv6-nextheader" },
+        "Hop Limit":       { length: 8,  default: "",  yang: "fid-ipv6-hoplimit" },
+        "Source IP":       { length: 128, default: "", yang: "fid-ipv6-src-ip" },
+        "Destination IP":  { length: 128, default: "", yang: "fid-ipv6-dest-ip" }
+      },
+      "UDP": {
+        "Source Port":     { length: 16, default: "", yang: "fid-udp-dev-port" },
+        "Destination Port":{ length: 16, default: "", yang: "fid-udp-app-port" },
+        "Length":          { length: 16, default: "", yang: "fid-udp-length" },
+        "Checksum":        { length: 16, default: "", yang: "fid-udp-checksum" }
+      },
+      "CoAP": {
+        "Version":         { length: 2,  default: "", yang: "fid-coap-version" },
+        "Type":            { length: 2,  default: "", yang: "fid-coap-type" },
+        "Token Length":    { length: 4,  default: "", yang: "fid-coap-tkl" },
+        "Code":            { length: 8,  default: "", yang: "fid-coap-code" },
+        "Message ID":      { length: 16, default: "", yang: "fid-coap-mid" }
+      },
+      "OSCORE": {
+        "Code":            { length: 8,  default: "", yang: "fid-oscore-code" },
+        "Partial IV":      { length: 8,  default: "", yang: "fid-oscore-piv" },
+        "KID":             { length: 8,  default: "", yang: "fid-oscore-kid" },
+        "Options":         { length: 0,  default: "", yang: "fid-oscore-options" }
+      },
+      "QUIC": {
+        "Version":         { length: 8,  default: "", yang: "fid-quic-version" },
+        "Connection ID":   { length: 64, default: "", yang: "fid-quic-connid" }
+      },
+      "MQTT": {
+        "Control Packet":  { length: 8,  default: "", yang: "fid-mqtt-control" },
+        "Remaining Length":{ length: 8,  default: "", yang: "fid-mqtt-remaining-length" }
+      },
+      "MQTT-SN": {
+        "Message Type":    { length: 8,  default: "", yang: "fid-mqtt-sn-type" },
+        "Flags":           { length: 8,  default: "", yang: "fid-mqtt-sn-flags" }
+      }
+    };
+
+    // Preset mapping for fragmentation.
+    const fragPresets = {
+      "lorawan_uplink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-up", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 },
+      "lorawan_downlink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-down", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 },
+      "lorawan_uplink_ack_on_error": { fragMode: "fragmentation-mode-ack-on-error", l2WordSize: 8, direction: "di-up", dtagSize: 2, fcnSize: 3, maxPacketSize: 51 },
+      "sigfox_uplink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-up", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 },
+      "sigfox_downlink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-down", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 },
+      "nbiot_uplink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-up", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 },
+      "nbiot_downlink_noack": { fragMode: "fragmentation-mode-no-ack", l2WordSize: 8, direction: "di-down", dtagSize: 0, fcnSize: 3, maxPacketSize: 51 }
+    };
+
+    /********* Helper Function: Get Union Field Options **********/
+    function getUnionFieldOptions() {
+      let unionSet = new Set();
+      const selectedProtocolCheckboxes = Array.from(document.querySelectorAll('input[name="protocol"]:checked'));
+      if(selectedProtocolCheckboxes.length === 0) {
+        // If none selected, include all protocols.
+        Object.keys(fieldProperties).forEach(proto => {
+          Object.keys(fieldProperties[proto]).forEach(field => {
+            unionSet.add(proto + "/" + field);
+          });
+        });
+      } else {
+        selectedProtocolCheckboxes.forEach(cb => {
+          let proto = cb.value;
+          Object.keys(fieldProperties[proto]).forEach(field => {
+            unionSet.add(proto + "/" + field);
+          });
+        });
+      }
+      return Array.from(unionSet).sort();
+    }
+
+    /********* Rules List Functions **********/
+    function addRule() {
+      const newRule = {
+        ruleIdValue: ruleCounter++,
+        ruleIdLength: 8,
+        ruleNature: "compression",
+        details: {}
+      };
+      rulesData.push(newRule);
+      currentRuleIndex = rulesData.length - 1;
+      renderRulesList();
+      loadRuleDetails(currentRuleIndex);
+    }
+
+    function renderRulesList() {
+      const tbody = document.querySelector("#rulesListTable tbody");
+      tbody.innerHTML = "";
+      rulesData.forEach((rule, index) => {
+        const tr = document.createElement("tr");
+        const tdId = document.createElement("td");
+        tdId.textContent = rule.ruleIdValue;
+        tr.appendChild(tdId);
+        const tdLen = document.createElement("td");
+        tdLen.textContent = rule.ruleIdLength;
+        tr.appendChild(tdLen);
+        const tdType = document.createElement("td");
+        tdType.textContent = (rule.ruleNature === "compression") ? "comp" : "frag";
+        tr.appendChild(tdType);
+        const tdSummary = document.createElement("td");
+        if(rule.ruleNature === "compression") {
+          if(rule.details && rule.details.protocols && rule.details.protocols.length > 0) {
+            tdSummary.textContent = rule.details.protocols.join("/");
+          } else {
+            tdSummary.textContent = "N/A";
+          }
+        } else if(rule.ruleNature === "fragmentation") {
+          if(rule.details) {
+            tdSummary.textContent = rule.details.fragMode + " / " + rule.details.direction;
+          } else {
+            tdSummary.textContent = "N/A";
+          }
+        }
+        tr.appendChild(tdSummary);
+        const tdActions = document.createElement("td");
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.onclick = () => loadRuleDetails(index);
+        tdActions.appendChild(editBtn);
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remove";
+        removeBtn.onclick = () => { removeRule(index); };
+        tdActions.appendChild(removeBtn);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function removeRule(index) {
+      rulesData.splice(index, 1);
+      if(currentRuleIndex === index) {
+        currentRuleIndex = null;
+        document.getElementById("rule-details-section").classList.add("hidden");
+      }
+      renderRulesList();
+    }
+
+    function loadRuleDetails(index) {
+      currentRuleIndex = index;
+      const rule = rulesData[index];
+      document.getElementById("rule-details-section").classList.remove("hidden");
+      document.getElementById("detailRuleIdValue").value = rule.ruleIdValue;
+      document.getElementById("detailRuleIdLength").value = rule.ruleIdLength;
+      document.getElementById("detailRuleNature").value = rule.ruleNature;
+      toggleRuleDataSection();
+      if(rule.ruleNature === "compression") {
+        if(!rule.details.protocols) { rule.details = { protocols: [], entries: [] }; }
+        document.querySelectorAll('input[name="protocol"]').forEach(cb => cb.checked = false);
+        rule.details.protocols.forEach(proto => {
+          const cb = document.querySelector('input[name="protocol"][value="' + proto + '"]');
+          if(cb) cb.checked = true;
+        });
+        updateAutoRows();
+        const tbody = document.querySelector("#compressionTable tbody");
+        tbody.innerHTML = "";
+        rule.details.entries.forEach(entry => {
+          addCompressionEntryRow(entry, true);
+        });
+      } else if(rule.ruleNature === "fragmentation") {
+        document.getElementById("fragPreset").value = "";
+        const d = rule.details || {};
+        document.getElementById("fragMode").value = d.fragMode || "fragmentation-mode-no-ack";
+        document.getElementById("l2WordSize").value = d.l2WordSize || "";
+        document.getElementById("fragDirection").value = d.direction || "di-up";
+        document.getElementById("dtagSize").value = d.dtagSize || "";
+        document.getElementById("fcnSize").value = d.fcnSize || "";
+        document.getElementById("maxPacketSize").value = d.maxPacketSize || "";
+      }
+    }
+
+    function toggleRuleDataSection() {
+      const nature = document.getElementById("detailRuleNature").value;
+      if(nature === "compression") {
+        document.getElementById("compression-data-section").classList.remove("hidden");
+        document.getElementById("fragmentation-data-section").classList.add("hidden");
+      } else {
+        document.getElementById("compression-data-section").classList.add("hidden");
+        document.getElementById("fragmentation-data-section").classList.remove("hidden");
+      }
+    }
+
+    function saveRuleDetails() {
+      if(currentRuleIndex === null) return;
+      const rule = rulesData[currentRuleIndex];
+      rule.ruleIdLength = Number(document.getElementById("detailRuleIdLength").value);
+      rule.ruleNature = document.getElementById("detailRuleNature").value;
+      if(rule.ruleNature === "compression") {
+        const protocols = Array.from(document.querySelectorAll('input[name="protocol"]:checked')).map(cb => cb.value);
+        rule.details.protocols = protocols;
+        const entries = [];
+        const rows = document.querySelectorAll("#compressionTable tbody tr");
+        rows.forEach(row => {
+          const cells = row.querySelectorAll("td");
+          let fidStr = cells[0].querySelector("select").value;
+          let yangId = fidStr;
+          if(row.getAttribute("data-auto") === "true") {
+            const parts = fidStr.split("/");
+            if(parts.length === 2) {
+              const [proto, field] = parts;
+              if(fieldProperties[proto] && fieldProperties[proto][field]) {
+                yangId = fieldProperties[proto][field].yang;
+              }
+            }
+          }
+          entries.push({
+            fid: yangId,
+            fl: cells[1].querySelector("input").value,
+            fp: cells[2].querySelector("input").value,
+            di: cells[3].querySelector("select").value,
+            tv: cells[4].querySelector("input").value,
+            mo: cells[5].querySelector("select").value,
+            cda: cells[6].querySelector("select").value
+          });
+        });
+        rule.details.entries = entries;
+      } else if(rule.ruleNature === "fragmentation") {
+        rule.details = {
+          fragMode: document.getElementById("fragMode").value,
+          l2WordSize: Number(document.getElementById("l2WordSize").value),
+          direction: document.getElementById("fragDirection").value,
+          dtagSize: Number(document.getElementById("dtagSize").value),
+          fcnSize: Number(document.getElementById("fcnSize").value),
+          maxPacketSize: Number(document.getElementById("maxPacketSize").value)
+        };
+      }
+      renderRulesList();
+      alert("Rule details saved.");
+    }
+
+    /********* Compression Rule Entries Functions **********/
+    function updateAutoRows() {
+      const selectedProtocolCheckboxes = Array.from(document.querySelectorAll('input[name="protocol"]:checked'));
+      const selectedProtocols = selectedProtocolCheckboxes.map(cb => cb.value);
+      let unionArray = getUnionFieldOptions();
+      const tbody = document.querySelector("#compressionTable tbody");
+      const autoRows = tbody.querySelectorAll('tr[data-auto="true"]');
+      autoRows.forEach(row => {
+        const proto = row.getAttribute("data-protocol");
+        if(!selectedProtocols.includes(proto)) {
+          row.remove();
+        }
+      });
+      selectedProtocols.forEach(protocol => {
+        const fields = Object.keys(fieldProperties[protocol] || {});
+        fields.forEach(field => {
+          const exists = tbody.querySelector(`tr[data-auto="true"][data-protocol="${protocol}"][data-field="${field}"]`);
+          if(!exists) {
+            const defaultOption = protocol + "/" + field;
+            const defaultProps = fieldProperties[protocol][field];
+            addCompressionEntryRow({
+              fid: defaultOption,
+              fl: defaultProps.length,
+              fp: 1,
+              di: "bidirectional",
+              tv: defaultProps.default,
+              mo: defaultProps.default !== "" ? "mo-equal" : "mo-ignore",
+              cda: defaultProps.default !== "" ? "cda-not-sent" : "cda-value-sent"
+            }, true, protocol, field);
+          }
+        });
+      });
+      const allAutoRows = tbody.querySelectorAll('tr[data-auto="true"]');
+      allAutoRows.forEach(row => {
+        const fidSelect = row.cells[0].querySelector("select");
+        fidSelect.innerHTML = "";
+        unionArray.forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = opt;
+          fidSelect.appendChild(option);
+        });
+        const defaultVal = row.getAttribute("data-protocol") + "/" + row.getAttribute("data-field");
+        fidSelect.value = unionArray.includes(defaultVal) ? defaultVal : unionArray[0] || "";
+      });
+    }
+
+    function addCompressionEntryRow(entryData, auto, protocol, field) {
+      const tbody = document.querySelector("#compressionTable tbody");
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-auto", auto ? "true" : "false");
+      if(auto) {
+        tr.setAttribute("data-protocol", protocol);
+        tr.setAttribute("data-field", field);
+      }
+      let td = document.createElement("td");
+      const fidSelect = document.createElement("select");
+      let unionArray = getUnionFieldOptions();
+      if(unionArray.length > 0) {
+        unionArray.forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = opt;
+          fidSelect.appendChild(option);
+        });
+        fidSelect.value = unionArray.includes(entryData.fid) ? entryData.fid : unionArray[0];
+      }
+      td.appendChild(fidSelect);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const flInput = document.createElement("input");
+      flInput.type = "number";
+      flInput.min = 0;
+      flInput.value = entryData.fl;
+      td.appendChild(flInput);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const fpInput = document.createElement("input");
+      fpInput.type = "number";
+      fpInput.min = 1;
+      fpInput.value = entryData.fp;
+      td.appendChild(fpInput);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const diSelect = document.createElement("select");
+      ["bidirectional", "di-up", "di-down"].forEach(opt => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt;
+        diSelect.appendChild(option);
+      });
+      diSelect.value = entryData.di;
+      td.appendChild(diSelect);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const tvInput = document.createElement("input");
+      tvInput.type = "text";
+      tvInput.value = entryData.tv;
+      td.appendChild(tvInput);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const moSelect = document.createElement("select");
+      ["mo-equal", "mo-ignore", "mo-msb", "mo-match-mapping"].forEach(opt => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt;
+        moSelect.appendChild(option);
+      });
+      moSelect.value = entryData.mo;
+      td.appendChild(moSelect);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      const cdaSelect = document.createElement("select");
+      ["cda-not-sent", "cda-value-sent", "cda-lsb", "cda-mapping-sent", "cda-compute", "cda-deviid", "cda-appiid"].forEach(opt => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt;
+        cdaSelect.appendChild(option);
+      });
+      cdaSelect.value = entryData.cda;
+      td.appendChild(cdaSelect);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.className = "row-actions";
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "Remove";
+      removeBtn.onclick = () => { tr.remove(); };
+      td.appendChild(removeBtn);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+
+    function addManualEntry() {
+      const entryData = {
+        fid: "",
+        fl: "",
+        fp: 1,
+        di: "bidirectional",
+        tv: "",
+        mo: "mo-ignore",
+        cda: "cda-value-sent"
+      };
+      addCompressionEntryRow(entryData, false);
+      updateAutoRows();
+    }
+
+    /********* Generate JSON **********/
+    function generateJSON() {
+      const context = { rules: [] };
+      rulesData.forEach(rule => {
+        const r = {
+          ruleId: { value: rule.ruleIdValue, length: rule.ruleIdLength },
+          ruleNature: (rule.ruleNature === "compression") ? "nature-compression" : "nature-fragmentation"
+        };
+        if(rule.ruleNature === "compression") {
+          r.compression = rule.details;
+        } else if(rule.ruleNature === "fragmentation") {
+          r.fragmentation = rule.details;
+        }
+        context.rules.push(r);
+      });
+      document.getElementById("outputJSON").textContent = JSON.stringify(context, null, 2);
+    }
+
+    /********* Import / Export Context Functions **********/
+    function exportJSON() {
+      generateJSON();
+      const jsonStr = document.getElementById("outputJSON").textContent;
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "schc_context.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if(imported.rules && Array.isArray(imported.rules)) {
+            rulesData = imported.rules.map(rule => {
+              return {
+                ruleIdValue: rule.ruleId.value,
+                ruleIdLength: rule.ruleId.length,
+                ruleNature: rule.ruleNature.includes("compression") ? "compression" : "fragmentation",
+                details: rule.compression || rule.fragmentation || {}
+              };
+            });
+            const maxId = Math.max(...rulesData.map(r => r.ruleIdValue), 0);
+            ruleCounter = maxId + 1;
+            renderRulesList();
+            if(rulesData.length > 0) loadRuleDetails(0);
+            alert("SCHC context imported successfully.");
+          } else {
+            alert("Invalid SCHC context JSON.");
+          }
+        } catch (err) {
+          alert("Error parsing JSON: " + err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    /********* Protocols Import/Export Functions **********/
+    function downloadProtocols() {
+      const jsonStr = JSON.stringify(fieldProperties, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "protocols.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function loadProtocols(event) {
+      const file = event.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          fieldProperties = imported;
+          alert("Protocols updated successfully.");
+          updateAutoRows();
+        } catch (err) {
+          alert("Error parsing protocols JSON: " + err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    /********* Fragmentation Preset Function **********/
+    function applyFragPreset() {
+      const preset = document.getElementById("fragPreset").value;
+      if(preset && fragPresets[preset]) {
+        const mapping = fragPresets[preset];
+        document.getElementById("fragMode").value = mapping.fragMode;
+        document.getElementById("l2WordSize").value = mapping.l2WordSize;
+        document.getElementById("fragDirection").value = mapping.direction;
+        document.getElementById("dtagSize").value = mapping.dtagSize;
+        document.getElementById("fcnSize").value = mapping.fcnSize;
+        document.getElementById("maxPacketSize").value = mapping.maxPacketSize;
+      }
+    }
+
+    // Initialize view.
+    toggleRuleDataSection();
+  </script>
+</body>
+</html>
