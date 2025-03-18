@@ -93,21 +93,6 @@
     <p>Alexander Pelov, 2025</p>
   </section>
 
-  <!-- Protocols Management Section -->
-  <section id="protocols-section">
-    <h2>Protocols Management</h2>
-    <p>You can load new protocol definitions (JSON) or download the current protocols.</p>
-    <button type="button" onclick="downloadProtocols()">Download Protocols JSON</button>
-    <input type="file" id="protocolFile" accept="application/json" onchange="loadProtocols(event)" />
-  </section>
-
-  <!-- Import/Export Context Section -->
-  <section id="import-export-section">
-    <h2>Import / Export SCHC Context</h2>
-    <button type="button" onclick="exportJSON()">Export Context JSON</button>
-    <input type="file" id="importFile" accept="application/json" onchange="importJSON(event)" />
-  </section>
-
   <!-- 1. Rules List Section -->
   <section id="rules-list-section">
     <h2>Rules List</h2>
@@ -236,6 +221,22 @@
 
     <button type="button" onclick="saveRuleDetails()">Save Rule Details</button>
   </section>
+
+  <!-- Protocols Management Section -->
+  <section id="protocols-section">
+    <h2>Protocols Management</h2>
+    <p>You can load new protocol definitions (JSON) or download the current protocols.</p>
+    <button type="button" onclick="downloadProtocols()">Download Protocols JSON</button>
+    <input type="file" id="protocolFile" accept="application/json" onchange="loadProtocols(event)" />
+  </section>
+
+  <!-- Import/Export Context Section -->
+  <section id="import-export-section">
+    <h2>Import / Export SCHC Context</h2>
+    <button type="button" onclick="exportJSON()">Export Context JSON</button>
+    <input type="file" id="importFile" accept="application/json" onchange="importJSON(event)" />
+  </section>
+  
 
   <button type="button" onclick="generateJSON()">Generate JSON</button>
   <h2>Generated SCHC Context JSON</h2>
